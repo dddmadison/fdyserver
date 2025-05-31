@@ -7,9 +7,10 @@ const port = process.env.PORT || 5000;
 
 // ✅ CORS 설정 (명시적 허용)
 const corsOptions = {
-  origin: '*',  // 개발 중엔 '*' 가능, 배포 시엔 'https://your-frontend-url.com'
+  origin: ['http://localhost:3000', 'https://fdy-frontend.onrender.com'], // 허용할 프론트엔드 origin
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 };
 
 app.use(cors(corsOptions));
