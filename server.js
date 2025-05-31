@@ -1,15 +1,16 @@
-const express = require('express');
-const axios = require('axios');
+const express  = require('express');
+const cors     = require('cors');
+const axios    = require('axios');
 const mongoose = require('mongoose');
-const app = express();
-const port = process.env.PORT || 5000;
+const app      = express();
+const port     = process.env.PORT || 5000;
 
-app.use(function(req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-  next();
-});
+/* ✅ 모든 origin 허용 (개발용) */
+app.use(cors());                // 일반 요청
+app.options('*', cors());       // 프리플라이트(OPTIONS)도 처리
+
+/* 아래에 나머지 라우터 … */
+
 
 // Use environment variables for database URL
 const dbUri = process.env.DB_URI;
