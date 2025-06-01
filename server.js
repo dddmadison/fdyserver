@@ -84,5 +84,7 @@ app.get('/naver-shopping', async (req, res) => {
   }
 });
 
-// ────────────────────────────────────────────────
-app.listen(port, () => console.log(`Server running on port ${port}`));
+const PORT = process.env.PORT || 5000;  // ✅ Render가 할당하는 포트
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
