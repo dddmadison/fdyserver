@@ -59,7 +59,7 @@ app.get('/flowers', async (req, res) => {
 });
 
 /* ---------- /naver-shopping ---------- */
-app.get('/naver-shopping', async (req, res) => {
+app.get('/naverShopping', async (req, res) => {
   const flowername = req.query.flowername;
   if (!flowername) return res.status(400).json({ error: 'flowername required' });
 
