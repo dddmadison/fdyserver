@@ -1,90 +1,121 @@
-// server.js
-require('dotenv').config();
-const express  = require('express');
-const cors     = require('cors');
-const axios    = require('axios');
+const express = require('express');
+const axios = require('axios');
 const mongoose = require('mongoose');
-const app      = express();
-const port     = process.env.PORT || 5000;
+const app = express();
+const port = process.env.PORT || 5000;
 
-// ────────────────────────────────────────────────
-app.use(cors());           // OPTIONS-preflight 포함 CORS 전부 처리
-// ────────────────────────────────────────────────
+app.use(function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  next();
+});
 
-// MongoDB 연결 --------------------------------------------------------
-mongoose
-  .connect(process.env.DB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('MongoDB connected'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+// Use environment variables for database URL
+const dbUri = process.env.DB_URI;
 
-const flowerSchema = new mongoose.Schema(
-  {
-    flowername:    String,
-    habitat:       String,
-    binomialName:  String,
-    classification:String,
-    flowername_kr: String,
-  },
-  { collection: 'flowers' }
-);
-const Flower = mongoose.model('Flower', flowerSchema);
+mongoose.connect(dbUri);
 
-// 꽃 정보 --------------------------------------------------------------
+const flowerSchema = new mongoose.Schema({
+  flowername: String,
+  habitat: String,
+  binomialName: String,
+  classification: String,
+  flowername_kr: String
+});
+
+const Flower = mongoose.model('Flower', flowerSchema, 'flowers');
+
 app.get('/flowers', async (req, res) => {
-  try {
-    const keyword = req.query.flowername;
-    const flower = await Flower.findOne({
-      $or: [{ flowername: keyword }, { flowername_kr: keyword }],
-    });
+  const flowername = req.query.flowername;
 
-    if (!flower) return res.status(404).json({ error: 'Flower not found' });
-    const { flowername, habitat, binomialName, classification, flowername_kr } = flower;
-    res.json({ flowername, habitat, binomialName, classification, flowername_kr });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+  try { 
+    
+    const flower = await Flower.findOne({ 
+        $or: [
+            { flowername: flowername },
+            { flowername_kr: flowername }
+          ]
+        });
+
+    if (!flower) {
+      res.status(404).json({ error: 'Flower not found' });
+    } else {
+      const { flowername, habitat, binomialName, classification, flowername_kr } = flower;
+      res.json({ flowername, habitat, binomialName, classification, flowername_kr }); 
+    }
+  } catch (error) {
+    console.error('Error retrieving flower information:', error);
+    res.status(500).json({ error: 'An error occurred' });
   }
 });
 
-// 네이버 쇼핑 ----------------------------------------------------------
 app.get('/naver-shopping', async (req, res) => {
   const flowername = req.query.flowername;
-  if (!flowername) return res.status(400).json({ error: 'flowername is required' });
 
-  // 라우트 내부에서 자격 증명 & 파라미터 선언
-  const clientId        = process.env.CLIENT_ID;
-  const clientSecret    = process.env.CLIENT_SECRET;
-  const displayPerPage  = 100;
-  const maxResults      = 1000;
+  if (!flowername) {
+    res.status(400).json({ error: 'Flowername is required' });
+    return;
+  }
+
+  // Use environment variables for Naver API credentials
+  const clientId = process.env.CLIENT_ID;
+  const clientSecret = process.env.CLIENT_SECRET;
+  const displayPerPage = 100; 
+  const maxResults = 1000; 
+
+  let start = 1; 
+
+  async function fetchNaverShoppingResults() {
+    try {
+      const allResults = [];
+
+      while (start <= maxResults) { 
+        const apiUrl = `https://openapi.naver.com/v1/search/shop.json?query=${encodeURIComponent(flowername)}&display=${displayPerPage}&start=${start}&sort=sim`;
+      
+        const response = await axios.get(apiUrl, {
+          headers: {
+            'X-Naver-Client-Id': clientId,
+            'X-Naver-Client-Secret': clientSecret,
+          },
+        });
+
+        const data = response.data;
+        const items = data.items || [];
+
+        if (items.length === 0) {
+          break; 
+        }
+
+        allResults.push(...items);
+
+       
+        start += displayPerPage;
+
+        if (start > maxResults) {
+          break;
+        }
+      }
+
+      return allResults;
+    } catch (error) {
+      console.error('네이버 쇼핑 API 오류:', error);
+      throw new Error('Naver Shopping API error');
+    } finally {
+    }
+  }
 
   try {
-    const allResults = [];
-
-    for (let start = 1; start <= maxResults; start += displayPerPage) {
-      const url =
-        `https://openapi.naver.com/v1/search/shop.json` +
-        `?query=${encodeURIComponent(flowername)}` +
-        `&display=${displayPerPage}&start=${start}&sort=sim`;
-
-      const { data } = await axios.get(url, {
-        headers: {
-          'X-Naver-Client-Id':     clientId,
-          'X-Naver-Client-Secret': clientSecret,
-        },
-      });
-
-      if (!data.items?.length) break;      // 더 이상 결과가 없으면 종료
-      allResults.push(...data.items);
-    }
-
-    res.json({ items: allResults });
-  } catch (err) {
-    console.error('Naver Shopping API error:', err);
-    res.status(500).json({ error: 'Naver Shopping API error' });
+    const data = await fetchNaverShoppingResults();
+    console.log(`총 ${data.length}개의 검색 결과를 가져왔습니다.`);
+    res.json({ items: data }); 
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Naver Shopping API error' }); 
   }
 });
 
-const PORT = process.env.PORT || 5000;  // ✅ Render가 할당하는 포트
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
+
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
 });
