@@ -13,7 +13,7 @@ app.use(
   cors({
     origin: [
       'http://localhost:3000',          // 개발
-      'https://YOUR_FRONT_DOMAIN'       // 배포 프런트가 있다면 추가
+      'https://everyflower.netlify.app'       // 배포 프런트가 있다면 추가
     ],
     methods: 'GET,POST,PUT,DELETE,OPTIONS',
     credentials: false
